@@ -9,8 +9,8 @@ def bar():
 
 
 def baz():
-	def qux():
-		print 4
+	def qux(a):
+		print a-1
 	
 	print foo(bar(), 2, 3, 4)
 
