@@ -1,0 +1,109 @@
+<head>
+<style type="text/css">
+	body {
+		background: #FFFFFF;
+	}
+	table {
+		border-collapse:collapse;
+		table-layout: fixed;
+		border: 0px;
+	}
+	table, th, td {
+		text-align: center;
+		font-size: 10px;
+	}
+	th, td {
+		border: 1px #CCCCDD solid;
+		min-width: 8px;
+		max-height: 10px;
+		background: #EEEEFF;
+		margin: 0px;
+		overflow: hidden;
+	}
+	th.src, td.src {
+		border: 0px;
+		background: #FFFFFF;
+		text-align: left;
+		max-width: 0px;
+		max-height: 10px;
+		overflow: visible;
+		font-family: Consolas;
+		white-space: nowrap;
+		color: #666666;
+	}
+	div.src {
+		position: relative; 
+		left: 5px
+	}
+	th.ln, td.ln {
+		border: 0px;
+		background: #FFFFFF;
+		text-align: right;
+		width: 30px;
+		padding-right: 5px;
+		color: #666666;
+	}
+	tr {
+		height: 10px;
+	}
+</style>
+<script type="text/javascript">
+	window.loadContent = function (c) {
+		t = document.getElementById('mappingTable');
+		log = document.getElementById('log');
+		
+		// create appropriate number of table rows
+		codeLines = c.targetCode.split('\n');
+		maxLineNumber = codeLines.length;
+		/*for (i in c.matchingBlocks)
+		{
+			block = c.matchingBlocks[i];
+			if (block.targetStart+block.blockSize > maxLineNumber)
+				maxLineNumber = block.targetStart+block.blockSize;
+		}*/
+		//log.innerHTML += 'maxLineNumber = '+maxLineNumber+'<br/>';
+		rows = new Array();
+		for (i=0; i<maxLineNumber; i++)
+		{
+			row = document.createElement('tr');
+			row.setAttribute('id', 'line-'+i);
+			t.appendChild(row);
+				
+			cell = document.createElement('th');
+			cell.setAttribute('class', 'ln');
+			cell.innerText = i;
+			row.appendChild(cell);
+				
+			cell = document.createElement('th');
+			cell.setAttribute('class', 'src');
+			div = document.createElement('div');
+			div.setAttribute('class', 'src');
+			div.innerText = codeLines[i];
+			cell.appendChild(div);
+			row.appendChild(cell);
+			
+			rows[i] = row;
+		}
+		
+		// insert blocks
+		for (i in c.matchingBlocks)
+		{
+			block = c.matchingBlocks[i];
+			//log.innerHTML += 'block nr.'+i+' is: '+block.targetStart+'-'+(block.targetStart+block.blockSize)+'<br/>';
+			row = rows[block.targetStart];
+			if (row == null)
+				throw new Error('Block start exceeding the source file ('+rows.length+' rows, target start: '+block.targetStart+')');
+				
+			cell = document.createElement('th');
+			cell.setAttribute('rowspan', block.blockSize);
+			//cell.style.width = block.symbols.length+'px';
+			row.appendChild(cell);
+		};
+		t = document.getElementById('mappingTable');
+	};
+</script>
+</head>
+<body>
+	<p id="log">&nbsp;</p>
+	<table id="mappingTable"></table>
+</body>

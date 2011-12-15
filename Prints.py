@@ -7,6 +7,7 @@ import re
 import hashlib
 import time
 import copy
+import json
 
 
 symbolPat = r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -42,6 +43,7 @@ class SymbolPrints:
 class CodePrints:
 	def __init__(self):
 		self.code = ''
+		lineCount = 0
 		self.symbols = {} # symbol name -> SymbolPrints object
 		
 	def __str__(self):
@@ -90,9 +92,11 @@ class CodePrints:
 		
 class ComparisonResult:
 	def __init__(self):
-		self.source = None	#CodePrints object
-		self.target = None	#CodePrints object
-		self.matches = []	# list of source line numbers per line
+		self.source = None	# CodePrints object
+		self.target = None	# CodePrints object
+		self.matches = []	# a list of source line numbers per line
+		self.blocks = []	# a list of tuples of form: 
+							#  (src_start=int, dst_start=int, block_size=int, proof=[symbol=string, ...])
 		
 	def __str__(self):
 		s = '[\n'
@@ -101,57 +105,41 @@ class ComparisonResult:
 			s += '  %4d: '%i + str(z) + ',\n'
 			i += 1
 		return s + ']'
-		return 'Matching stats: \n  max guesses per line: %d\n  avg guesses per line: %d' % \
-			(max([len(x) for x in self.matches]), sum([len(x) for x in self.matches])/len(self.matches))
+		# return 'Matching stats: \n  max guesses per line: %d\n  avg guesses per line: %d' % \
+			# (max([len(x) for x in self.matches]), sum([len(x) for x in self.matches])/len(self.matches))
 			
-	def Report(self):
-		def FilterStrongMatches(l):
-			out = []
-			lineNumbers = [y[0] for y in l]
-			for x in set(lineNumbers):
-				if lineNumbers.count(x) >= blockMinRepCount:
-					out.append((x, tuple( [ y[1] for y in l if y[0] == x ] )))
-			return out
-		#reducedMatches = map(FilterStrongMatches, self.matches)
+	def Report(self, name):		
+		# s = ''
+		# for b in self.blocks:
+			# if verbose:
+				# s += '%4d lines from %d to %d, proof: '%(b[2], b[1], b[0]) + str(b[3]) + '\n'
+			# else:
+				# s += '%4d lines from %d to %d'%(b[2], b[1], b[0]) + '\n'
+		# return s
 		
-		s = ''
+		# form a json object with report data
+		jsonObj = {
+			'sourceCode': self.source.code, 
+			'targetCode': self.target.code, 
+			'matchingBlocks': []
+			}
+		for b in self.blocks:
+			jsonObj['matchingBlocks'].append({
+				'sourceStart': b[0], 
+				'targetStart': b[1], 
+				'blockSize': b[2], 
+				'symbols': b[3]
+				})
+				
+		# output the report from html template
+		htmlTemplate = open('ReportTemplate.htm', 'r').read()
+		htmlOutput = htmlTemplate + \
+			'\n\n<script type="text/javascript">\n\tvar content=' + \
+			json.dumps(jsonObj, ensure_ascii=False) + \
+			';\n\twindow.loadContent(content);\n</script>'
+		open(name+'.htm', 'w').write(htmlOutput)
 		
-		uniqueLineNumbers = []
-		for l in self.matches:
-			uniqueLineNumbers.append(list(set([y[0] for y in l])))
-		blocks = []
-		for lineIndex1 in range(len(uniqueLineNumbers)):
-			lineNumbers2 = uniqueLineNumbers[lineIndex1]
-			for lineNumber2 in lineNumbers2:
-				# find the block
-				wondIt = 1
-				lastFoundOffset = 0
-				proof = []
-				while lineIndex1+wondIt < len(uniqueLineNumbers):
-					if lineNumber2+wondIt in uniqueLineNumbers[lineIndex1+wondIt]:
-						lastFoundOffset = wondIt
-						proof += [x[1] for x in self.matches[lineIndex1+wondIt] if x[0] == lineNumber2+wondIt]
-					elif wondIt-lastFoundOffset > blockMaxGap:
-						break
-					wondIt += 1
-					
-				# save the block
-				if len(proof) >= blockMinRepCount:
-					blocks.append((lineIndex1, lineNumber2, wondIt, proof))
-		
-		for b in blocks:
-			if verbose:
-				s += '%4d lines from %d to %d, proof: '%(b[2], b[1], b[0]) + str(b[3]) + '\n'
-			else:
-				s += '%4d lines from %d to %d'%(b[2], b[1], b[0]) + '\n'
-		return s
-		
-		# s = '[\n'
-		# i = 0
-		# for z in reducedMatches:
-			# s += '  %4d: '%i + str(z) + ',\n'
-			# i += 1
-		# return s + ']'
+		return 'Done. Report in \'%s\'.' % (name+'.htm')
 
 
 # returns a dictionary of line-positions of symbols in the code
@@ -271,10 +259,35 @@ def CompareCodePrints(cp1, cp2):
 					if verbose:
 						print '  Found subsequence:', l1[mStart1:mStart1+mLen]
 				
+	# create the results container
 	cr = ComparisonResult()
 	cr.source = cp1
 	cr.target = cp2
 	cr.matches = [sorted(x, key = lambda y: y[0]) for x in linesMapping]
+	
+	# form matches in blocks
+	uniqueLineNumbers = []
+	for l in cr.matches:
+		uniqueLineNumbers.append(list(set([y[0] for y in l])))
+	for targetLineNumber in range(len(uniqueLineNumbers)):
+		sourceLineNumbers = uniqueLineNumbers[targetLineNumber]
+		for sourceLineNumber in sourceLineNumbers:
+			# find the block
+			wondIt = 1
+			lastFoundOffset = 0
+			proof = []
+			while targetLineNumber+wondIt < len(uniqueLineNumbers):
+				if sourceLineNumber+wondIt in uniqueLineNumbers[targetLineNumber+wondIt]:
+					lastFoundOffset = wondIt
+					proof += [x[1] for x in cr.matches[targetLineNumber+wondIt] if x[0] == sourceLineNumber+wondIt]
+				elif wondIt-lastFoundOffset > blockMaxGap:
+					break
+				wondIt += 1
+				
+			# save the block
+			if len(proof) >= blockMinRepCount:
+				cr.blocks.append((sourceLineNumber, targetLineNumber, wondIt, proof))
+				
 	return cr
 
 	
@@ -283,5 +296,5 @@ if __name__ == '__main__':
 	cp2 = CodePrints.ParseFile('real_tests\cz\Unit2.h')
 	
 	cr = CompareCodePrints(cp1, cp2)
-	print cr.Report()
+	print cr.Report('Unit2Test')
 	
