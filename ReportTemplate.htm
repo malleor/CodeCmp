@@ -73,12 +73,14 @@
 			cell.setAttribute('class', 'ln');
 			cell.innerText = i;
 			row.appendChild(cell);
-				
+			
 			cell = document.createElement('th');
 			cell.setAttribute('class', 'src');
 			div = document.createElement('div');
 			div.setAttribute('class', 'src');
-			div.innerText = codeLines[i];
+			pre = document.createElement('pre');
+			pre.innerText = codeLines[i];
+			div.appendChild(pre);
 			cell.appendChild(div);
 			row.appendChild(cell);
 			
